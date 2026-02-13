@@ -1,0 +1,39 @@
+[project]
+name = "trident-wm"
+version = "0.1.0"
+description = "World Model: Perception (V), Memory (M), Controller (C)"
+readme = "README.rst"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "Samuel Diop", email = "snfdiop@outlook.com" }]
+
+dependencies = [
+    "torch",
+    "torchvision",
+    "lightning",
+    "einops",
+    "click",
+    "numpy",
+    "tqdm",
+    "wandb",
+    "pytest",
+]
+
+[project.optional-dependencies]
+gpu = [ "triton" ]
+dev = [ "ruff", "pytest" ]
+
+[project.scripts]
+trident = "trident_wm.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/trident_wm"]
+
+[[tool.uv.index]]
+name = "pytorch-cu121"
+url = "https://download.pytorch.org/whl/cu121"
+explicit = true
