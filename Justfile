@@ -15,24 +15,30 @@ setup-gpu:
     @echo "📦 Initializing GPU environment..."
     {{nix_cmd}} uv venv && {{nix_cmd}} uv pip install -e .[gpu]
 
-# 3. Development Installation (Hardware-aware editable install)
+# 3. Development Installation
 dev-install:
-    @echo "🛠️ Installing trident-wm in editable mode with dev extras..."
+    @echo "🛠️ Installing trident-wm in editable mode..."
     {{nix_cmd}} uv pip install -e .[dev,gpu]
 
-# 4. Clean: The "Nuclear Option"
+# 4. Clean
 clean:
     @echo "🗑️ Cleaning project artifacts..."
     rm -rf .venv/ build/ dist/ *.egg-info/ .pytest_cache/ .ruff_cache/
     find . -type d -name "__pycache__" -exec rm -rf {} +
     @echo "✅ Project cleaned."
 
-# 5. Core Sprint Commands
-train args="":
-    {{nix_cmd}} trident fit --config configs/default.yaml {{args}}
+# 5. Core Sprint Commands (Using the installed 'trident' command)
+# Usage: just train config=configs/gpu_sprint.yaml device=gpu
+train config="configs/config_cpu_debug.yaml" device="cpu":
+    {{nix_cmd}} trident train --config {{config}} --device {{device}}
 
-evaluate ckpt="latest.ckpt":
-    {{nix_cmd}} trident test --config configs/default.yaml --ckpt_path {{ckpt}}
+# Usage: just evaluate ckpt=checkpoints/model.ckpt config=configs/gpu_sprint.yaml
+evaluate ckpt config="configs/config_gpu_sprint.yaml":
+    {{nix_cmd}} trident evaluate --checkpoint {{ckpt}} --config {{config}}
+
+# Usage: just test-shapes config=configs/config_cpu_test.yaml
+test-shapes config="configs/config_cpu_test.yaml":
+    {{nix_cmd}} trident test-shapes --config {{config}}
 
 test:
     {{nix_cmd}} pytest src/trident_wm/tests/
@@ -41,6 +47,5 @@ test:
 check-gpu:
     {{nix_cmd}} python -c "import torch; print(f'GPU Available: {torch.cuda.is_available()}'); print(f'Device: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"None\"}')"
 
-# Enter the dev shell or run a specific command (Defaults to bash)
 dev *args:
     {{nix_cmd}} {{ if args == "" { "bash" } else { args } }}

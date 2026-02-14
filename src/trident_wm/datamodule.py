@@ -1,5 +1,7 @@
 import lightning as L
+import torch
 from torch.utils.data import DataLoader, Subset
+from torchvision.transforms import v2
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
 from trident_wm.constants import SEQ_LEN
 
@@ -13,9 +15,13 @@ class PushTDataModule(L.LightningDataModule):
         super().__init__()
         self.save_hyperparameters()
         self.dataset = None
-        self.train_ds = None
-        self.val_ds = None
-        self.test_ds = None
+        
+        # DINOv2 Requirement: Dimensions must be multiples of 14 (e.g., 224x224)
+        # We use v2 transforms for efficiency
+        self.image_transforms = v2.Compose([
+            v2.Resize((224, 224), antialias=True),
+            v2.ToDtype(torch.float32, scale=True),
+        ])
         
         self.delta_timestamps = {
             "observation.image": [i * 0.1 for i in range(SEQ_LEN)],
@@ -23,18 +29,17 @@ class PushTDataModule(L.LightningDataModule):
         }
 
     def prepare_data(self):
-        # Trigger download/cache check
         LeRobotDataset(self.hparams.repo_id)
 
     def setup(self, stage: str | None = None):
-        # We load the full dataset once to manage episode splits manually
         if self.dataset is None:
+            # Pass image_transforms directly to LeRobotDataset
             self.dataset = LeRobotDataset(
                 repo_id=self.hparams.repo_id,
-                delta_timestamps=self.delta_timestamps
+                delta_timestamps=self.delta_timestamps,
+                image_transforms=self.image_transforms
             )
             
-            # Create splits based on dataset indices
             total_size = len(self.dataset)
             train_size = int(0.8 * total_size)
             val_size = int(0.1 * total_size)
@@ -58,7 +63,8 @@ class PushTDataModule(L.LightningDataModule):
             self.val_ds,
             batch_size=self.hparams.batch_size,
             num_workers=self.hparams.num_workers,
-            shuffle=False
+            shuffle=False,
+            pin_memory=True
         )
 
     def test_dataloader(self):
