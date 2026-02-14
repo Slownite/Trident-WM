@@ -16,6 +16,7 @@ dependencies = [
     "numpy",
     "tqdm",
     "wandb",
+    "lerobot",
     "pytest",
 ]
 
