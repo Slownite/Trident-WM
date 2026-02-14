@@ -1,11 +1,12 @@
 import click
 import torch
 import lightning as L
+from omegaconf import OmegaConf
 from lightning.pytorch.loggers import WandbLogger
 
-from trident_wm.vision import Vision
-from trident_wm.memory import Memory
-from trident_wm.controller import VisualDecoder
+from trident_wm.pillars.vision import Vision
+from trident_wm.pillars.memory import Memory
+from trident_wm.pillars.controller import VisualDecoder
 from trident_wm.system import WorldSystem
 from trident_wm.datamodule import PushTDataModule
 
@@ -15,102 +16,79 @@ def main():
     pass
 
 @main.command()
-@click.option('--data', default="lerobot/pusht", help='HF Repo ID or local path')
-@click.option('--epochs', default=10, help='Total training epochs')
-@click.option('--batch_size', default=8, help='Batch size for CPU/GPU')
-@click.option('--lr', default=1e-4, help='Learning rate')
-@click.option('--device', default='cpu', type=click.Choice(['cpu', 'gpu']), help='Compute device')
-def train(data, epochs, batch_size, lr, device):
-    """Train the Vision Neck, Memory Transformer, and Visual Decoder"""
-    click.echo(f"🧬 Initializing V-M-D Pillars...")
+@click.option('--config', type=click.Path(exists=True), required=True)
+@click.option('--device', default=None, help="Override accelerator (cpu/gpu)")
+def train(config, device):
+    """Train the World Model using a YAML configuration"""
+    cfg = OmegaConf.load(config)
+    accelerator = device if device else cfg.trainer.get('accelerator', 'auto')
+    devices = cfg.trainer.get('devices', 'auto')
+
+    # Pillar Initialization
+    vision = Vision(out_dims=cfg.model.latent_dim)
+    memory = Memory(latent_dim=cfg.model.latent_dim, nhead=cfg.model.nhead, num_layers=cfg.model.num_layers)
+    decoder = VisualDecoder(input_latent_dim=cfg.model.latent_dim)
+
+    system = WorldSystem(vision=vision, memory=memory, decoder=decoder, lr=cfg.model.lr)
+    dm = PushTDataModule(repo_id=cfg.data.repo_id, batch_size=cfg.data.batch_size, num_workers=cfg.data.num_workers)
+
+    logger = WandbLogger(project=cfg.wandb.project, name=cfg.wandb.name, config=OmegaConf.to_container(cfg, resolve=True))
+
+    trainer_kwargs = OmegaConf.to_container(cfg.trainer, resolve=True)
+    trainer_kwargs.update({'accelerator': accelerator, 'devices': devices})
     
-    # Initialize Pillars
-    vision = Vision()
-    memory = Memory()
-    decoder = VisualDecoder()
-    
-    # Initialize System
-    system = WorldSystem(vision, memory, decoder, lr=lr)
-    
-    # Initialize DataModule
-    dm = PushTDataModule(repo_id=data, batch_size=batch_size)
-    
-    # Setup Logger
-    logger = WandbLogger(project="trident-wm", name="V-M-D-Training")
-    
-    # Initialize Trainer
-    trainer = L.Trainer(
-        accelerator=device,
-        devices=1,
-        max_epochs=epochs,
-        logger=logger,
-        precision="16-mixed" if device == 'gpu' else 32,
-        log_every_n_steps=10
-    )
-    
-    click.echo(f"🚀 Starting training on {device}...")
+    trainer = L.Trainer(logger=logger, **trainer_kwargs)
     trainer.fit(system, datamodule=dm)
 
 @main.command()
-@click.option('--checkpoint', required=True, help='Path to the .ckpt file')
-@click.option('--data', default="lerobot/pusht", help='HF Repo ID or local path')
-@click.option('--batch_size', default=4)
-def evaluate(checkpoint, data, batch_size):
-    """Evaluate World Model imagination on the unseen test split"""
-    click.echo(f"🌙 Loading System from checkpoint: {checkpoint}")
+@click.option('--config', type=click.Path(exists=True), required=True)
+@click.option('--checkpoint', type=click.Path(exists=True), required=True)
+def evaluate(config, checkpoint):
+    """Evaluate a saved model on the test dataset split"""
+    cfg = OmegaConf.load(config)
     
-    # Initialize Pillars (required for loading state_dict)
-    vision = Vision()
-    memory = Memory()
-    decoder = VisualDecoder()
+    # 1. Reconstruct Architecture from Config
+    vision = Vision(out_dims=cfg.model.latent_dim)
+    memory = Memory(latent_dim=cfg.model.latent_dim, nhead=cfg.model.nhead, num_layers=cfg.model.num_layers)
+    decoder = VisualDecoder(input_latent_dim=cfg.model.latent_dim)
+
+    # 2. Load Weights from Checkpoint
+    system = WorldSystem.load_from_checkpoint(checkpoint, vision=vision, memory=memory, decoder=decoder)
     
-    # Load System
-    system = WorldSystem.load_from_checkpoint(
-        checkpoint, 
-        vision=vision, 
-        memory=memory, 
-        decoder=decoder
-    )
+    # 3. Data (Auto-loads test split)
+    dm = PushTDataModule(repo_id=cfg.data.repo_id, batch_size=cfg.data.batch_size)
     
-    # Initialize DataModule
-    dm = PushTDataModule(repo_id=data, batch_size=batch_size)
+    logger = WandbLogger(project=cfg.wandb.project, name=f"eval-{cfg.wandb.name}")
+    trainer = L.Trainer(accelerator="auto", devices=1, logger=logger)
     
-    # Setup Logger for Evaluation results
-    logger = WandbLogger(project="trident-wm", name="V-M-D-Evaluation")
-    
-    # Initialize Trainer for Testing
-    trainer = L.Trainer(
-        accelerator="auto",
-        devices=1,
-        logger=logger
-    )
-    
-    click.echo(f"🧪 Running Test Split Evaluation...")
+    click.echo(f"🧪 Running test evaluation on {checkpoint}...")
     trainer.test(system, datamodule=dm)
 
 @main.command()
-def test_shapes():
-    """Quick sanity check for tensor shapes across the pipeline"""
-    click.echo("🧪 Testing Pillar Shape Consistency...")
+@click.option('--config', type=click.Path(exists=True), required=True)
+def test_shapes(config):
+    """Local sanity check to ensure the tensor flow works correctly"""
+    cfg = OmegaConf.load(config)
+    click.echo(f"🧪 Testing shapes with Latent Dim: {cfg.model.latent_dim}")
     
-    v = Vision()
-    m = Memory()
-    d = VisualDecoder()
+    vision = Vision(out_dims=cfg.model.latent_dim)
+    memory = Memory(latent_dim=cfg.model.latent_dim)
+    decoder = VisualDecoder(input_latent_dim=cfg.model.latent_dim)
     
-    # Batch=1, Seq=10, C=3, H=224, W=224
+    # Simulate batch [B, S, C, H, W]
     dummy_in = torch.randn(1, 10, 3, 224, 224)
     
     with torch.no_grad():
-        z = v(dummy_in)
-        click.echo(f"Vision Output: {z.shape} (Expected: [1, 10, 256])")
+        z = vision(dummy_in)
+        click.echo(f"Vision Output: {z.shape}")
         
-        z_hat = m(z[:, :-1, :])
-        click.echo(f"Memory Output: {z_hat.shape} (Expected: [1, 9, 256])")
+        z_pred = memory(z[:, :-1, :]) # Teacher forcing input
+        click.echo(f"Memory Prediction: {z_pred.shape}")
         
-        video_hat = d(z_hat)
-        click.echo(f"Decoder Output: {video_hat.shape} (Expected: [1, 9, 3, 224, 224])")
+        video_out = decoder(z_pred)
+        click.echo(f"Decoder Reconstruction: {video_out.shape}")
     
-    click.echo("✅ All shapes are consistent.")
+    click.echo("✅ Pipeline shapes are valid.")
 
 if __name__ == "__main__":
     main()
