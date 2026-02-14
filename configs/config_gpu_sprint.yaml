@@ -1,0 +1,21 @@
+model:
+  latent_dim: 256
+  lr: 0.0001              # Optimized for transformer stability
+  nhead: 8
+  num_layers: 4
+
+data:
+  repo_id: "lerobot/pusht"
+  batch_size: 32
+  num_workers: 4
+
+trainer:
+  accelerator: "gpu"
+  devices: "auto"         # Automatically detects the available GPU
+  max_epochs: 20
+  precision: "16-mixed"   # Accelerates training on modern GPUs
+  log_every_n_steps: 10
+
+wandb:
+  project: "trident-wm"
+  name: "gpu-standard-v1"

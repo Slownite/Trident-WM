@@ -1,33 +1,51 @@
 set shell := ["bash", "-c"]
 
+# Smart detection: Only use 'nix develop' if we aren't already in a Nix shell
+nix_cmd := if env_var_or_default("IN_NIX_SHELL", "false") == "false" { "nix develop --impure --command " } else { "" }
+
 # 1. Install Nix (Run this first on a fresh RunPod instance)
 install-nix:
     curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
 
-# 2. Setup GPU Environment (Handles the RunPod driver "glitch")
+# 2. Setup GPU Environment (Handles the RunPod driver mapping)
 setup-gpu:
     @echo "🔧 Mapping RunPod drivers to Nix-visible paths..."
     sudo mkdir -p /run/opengl-driver/lib
     sudo find /usr/lib/x86_64-linux-gnu -name 'libcuda.so*' -exec ln -sf {} /run/opengl-driver/lib/ \;
-    @echo "📦 Installing GPU-enabled environment..."
-    nix develop --impure --command bash -c "uv venv && uv pip install -e .[gpu]"
+    @echo "📦 Initializing GPU environment..."
+    {{nix_cmd}} uv venv && {{nix_cmd}} uv pip install -e .[gpu]
 
-# 3. Clean: The "Nuclear Option"
+# 3. Development Installation
+dev-install:
+    @echo "🛠️ Installing trident-wm in editable mode..."
+    {{nix_cmd}} uv pip install -e .[dev,gpu]
+
+# 4. Clean
 clean:
     @echo "🗑️ Cleaning project artifacts..."
     rm -rf .venv/ build/ dist/ *.egg-info/ .pytest_cache/ .ruff_cache/
     find . -type d -name "__pycache__" -exec rm -rf {} +
     @echo "✅ Project cleaned."
 
-# 4. Core Sprint Commands
-train args="":
-    nix develop --impure --command trident train --data ./push_t
+# 5. Core Sprint Commands (Using the installed 'trident' command)
+# Usage: just train config=configs/gpu_sprint.yaml device=gpu
+train config="configs/config_cpu_debug.yaml" device="cpu":
+    {{nix_cmd}} trident train --config {{config}} --device {{device}}
 
-evaluate ckpt="latest.pt":
-    nix develop --impure --command trident evaluate --checkpoint {{ckpt}}
+# Usage: just evaluate ckpt=checkpoints/model.ckpt config=configs/gpu_sprint.yaml
+evaluate ckpt config="configs/config_gpu_sprint.yaml":
+    {{nix_cmd}} trident evaluate --checkpoint {{ckpt}} --config {{config}}
+
+# Usage: just test-shapes config=configs/config_cpu_test.yaml
+test-shapes config="configs/config_cpu_test.yaml":
+    {{nix_cmd}} trident test-shapes --config {{config}}
 
 test:
-    nix develop --impure --command pytest tests/
+    {{nix_cmd}} pytest src/trident_wm/tests/
+
+# 6. Utility Commands
+check-gpu:
+    {{nix_cmd}} python -c "import torch; print(f'GPU Available: {torch.cuda.is_available()}'); print(f'Device: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"None\"}')"
 
 dev *args:
-    nix develop --impure --command {{if args == "" { "bash" } else { args }}}
+    {{nix_cmd}} {{ if args == "" { "bash" } else { args } }}

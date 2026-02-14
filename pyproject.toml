@@ -15,7 +15,9 @@ dependencies = [
     "click",
     "numpy",
     "tqdm",
-    "wandb",
+    "wandb[media]",
+    "lerobot",
+    "omegaConf",
     "pytest",
 ]
 
