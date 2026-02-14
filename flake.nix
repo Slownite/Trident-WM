@@ -16,8 +16,9 @@
       in
       {
         devShells.default = pkgs.mkShell {
-          buildInputs = with pkgs; [ uv python312 pkg-config ]
+          buildInputs = with pkgs; [ uv python312 pkg-config linuxHeaders ]
             ++ (if hasGpu then [ cudaPackages.cudatoolkit ] else []);
+	  C_INCLUDE_PATH = "${pkgs.linuxHeaders}/include";
 
           shellHook = ''
             if [ ! -d ".venv" ]; then uv venv; fi
