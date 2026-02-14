@@ -17,6 +17,7 @@ dependencies = [
     "tqdm",
     "wandb",
     "lerobot",
+    "omegaConf",
     "pytest",
 ]
 
