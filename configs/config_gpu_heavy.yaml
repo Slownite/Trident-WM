@@ -1,0 +1,23 @@
+model:
+  latent_dim: 512         # Larger latent space for more complex visual dynamics
+  lr: 0.00005             # Lower LR for better generalization with larger models
+  nhead: 8
+  num_layers: 6
+
+data:
+  repo_id: "lerobot/pusht"
+  batch_size: 64
+  num_workers: 8
+
+trainer:
+  accelerator: "gpu"
+  devices: "auto"
+  strategy: "ddp"         # Distributed Data Parallel for multi-GPU efficiency
+  max_epochs: 50
+  precision: "16-mixed"
+  accumulate_grad_batches: 2 # Simulates a larger batch size of 128
+  gradient_clip_val: 1.0     # Protects against exploding gradients in transformers
+
+wandb:
+  project: "trident-wm-heavy"
+  name: "gpu-high-capacity-run"

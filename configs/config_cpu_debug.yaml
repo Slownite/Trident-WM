@@ -1,0 +1,23 @@
+model:
+  latent_dim: 128         # Reduced dimension for faster CPU processing
+  lr: 0.001               # Higher LR for quick convergence testing
+  nhead: 4
+  num_layers: 2
+
+data:
+  repo_id: "lerobot/pusht"
+  batch_size: 2           # Minimum batch size for local memory
+  num_workers: 0          # Set to 0 on local machines to avoid multi-process overhead
+
+trainer:
+  accelerator: "cpu"
+  devices: 1
+  max_epochs: 1
+  limit_train_batches: 5  # Run only 5 batches to verify everything works
+  limit_val_batches: 2
+  precision: 32
+  log_every_n_steps: 1
+
+wandb:
+  project: "trident-wm-debug"
+  name: "cpu-sanity-check"
