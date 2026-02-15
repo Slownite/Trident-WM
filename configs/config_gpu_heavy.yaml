@@ -12,7 +12,7 @@ data:
 trainer:
   accelerator: "gpu"
   devices: "auto"
-  strategy: "ddp"         # Distributed Data Parallel for multi-GPU efficiency
+  strategy: "auto"         # Distributed Data Parallel for multi-GPU efficiency
   max_epochs: 50
   precision: "16-mixed"
   accumulate_grad_batches: 2 # Simulates a larger batch size of 128
