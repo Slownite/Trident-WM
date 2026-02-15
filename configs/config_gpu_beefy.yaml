@@ -1,0 +1,34 @@
+model:
+  # --- Beefier Architecture ---
+  latent_dim: 1024         # Expressive bottleneck for detailed visual dynamics
+  nhead: 16                # Increased heads for complex spatial attention
+  num_layers: 12           # Deep temporal transformer for multi-step reasoning
+  
+  # --- Optimization ---
+  lr: 0.00005              # Stable LR for high-capacity models
+  weight_decay: 0.001      # Standard regularization for transformers
+
+data:
+  repo_id: "lerobot/pusht"
+  batch_size: 128          # Large batch for stable gradients and GPU saturation
+  num_workers: 16          # Max throughput for your 16 vCPU pod
+  pin_memory: True         # Faster CPU-to-GPU data transfer
+
+trainer:
+  # --- Hardware Utilization ---
+  accelerator: "gpu"
+  devices: 1               # Use single RTX 6000 Ada
+  
+  # --- Precision & Stability ---
+  # bf16-mixed is native to Ada Lovelace and more stable than 16-mixed
+  precision: "bf16-mixed"  
+  
+  # --- Training Dynamics ---
+  max_epochs: 100          # Extended training for deeper architecture
+  accumulate_grad_batches: 1 # Direct batching is preferred with 48GB VRAM
+  gradient_clip_val: 1.0   # Protects against exploding gradients
+  log_every_n_steps: 10
+
+wandb:
+  project: "trident-wm-heavy"
+  name: "beefy-ada-6000-run"
