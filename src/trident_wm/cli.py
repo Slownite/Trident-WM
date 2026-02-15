@@ -20,6 +20,7 @@ def main():
 @click.option('--device', default=None, help="Override accelerator (cpu/gpu)")
 def train(config, device):
     """Train the World Model using a YAML configuration"""
+    torch.set_float32_matmul_precision('high')
     cfg = OmegaConf.load(config)
     accelerator = device if device else cfg.trainer.get('accelerator', 'auto')
     devices = cfg.trainer.get('devices', 'auto')
