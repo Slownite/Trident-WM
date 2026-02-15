@@ -1,30 +1,44 @@
 {
-  description = "trident-WM: Perception, Memory, Controller architecture";
+  description = "trident-WM: Perception, Memory, Decoder architecture";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
   outputs = { self, nixpkgs, flake-utils }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        pkgs = import nixpkgs { inherit system; config.allowUnfree = true; };
-        hasGpu = pkgs.stdenv.isLinux && (builtins.pathExists /dev/nvidia0);
-        runtimeLibs = with pkgs; [ stdenv.cc.cc.lib zlib libGL ffmpeg ]
-          ++ (if hasGpu then [ pkgs.linuxPackages.nvidia_x11 ] else []);
+        pkgs = import nixpkgs { 
+          inherit system; 
+          config.allowUnfree = true; 
+        };
+        # Essential libraries for PyTorch and Vision tasks
+        runtimeLibs = with pkgs; [ 
+          stdenv.cc.cc.lib 
+          zlib 
+          libGL 
+          glib
+          ffmpeg 
+        ];
       in
       {
         devShells.default = pkgs.mkShell {
-          buildInputs = with pkgs; [ uv python312 pkg-config linuxHeaders ]
-            ++ (if hasGpu then [ cudaPackages.cudatoolkit ] else []);
-	  C_INCLUDE_PATH = "${pkgs.linuxHeaders}/include";
+          buildInputs = with pkgs; [ 
+            uv 
+            python312 
+            pkg-config 
+            linuxHeaders 
+          ];
 
           shellHook = ''
-            if [ ! -d ".venv" ]; then uv venv; fi
-            source .venv/bin/activate
-            export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath runtimeLibs}${if hasGpu then ":/run/opengl-driver/lib" else ""}:$LD_LIBRARY_PATH"
-            echo "🔱 trident-WM Dev Shell Active"
+            # Activate venv if it exists
+            if [ -d ".venv" ]; then source .venv/bin/activate; fi
+            
+            # Critical: Bridge Nix libraries and RunPod's host GPU drivers
+            export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath runtimeLibs}:/run/opengl-driver/lib:$LD_LIBRARY_PATH"
+            
+            echo "🔱 trident-WM Dev Shell Active (RTX 6000 Ada Ready)"
           '';
         };
       });

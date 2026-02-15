@@ -7,15 +7,16 @@ nix_cmd := if env_var_or_default("IN_NIX_SHELL", "false") == "false" { "nix deve
 install-nix:
     curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
 
-# 2. Setup GPU Environment (Handles the RunPod driver mapping)
+# Initialize GPU Environment with proper pathing
 setup-gpu:
     @echo "🔧 Mapping RunPod drivers..."
     sudo mkdir -p /run/opengl-driver/lib
     sudo find /usr/lib/x86_64-linux-gnu -name 'libcuda.so*' -exec ln -sf {} /run/opengl-driver/lib/ \;
-    @echo "📦 Initializing GPU environment..."
-    # Add the export inside the nix_cmd execution
-    {{nix_cmd}} "export LD_LIBRARY_PATH=/run/opengl-driver/lib:\$LD_LIBRARY_PATH && uv venv && uv pip install -e .[gpu]"
-
+    @echo "📦 Initializing GPU environment inside Nix..."
+    {{nix_cmd}} bash -c "uv venv && uv pip install -e .[gpu]"
+# Utility to verify everything is linked correctly
+check-gpu:
+    {{nix_cmd}} python -c "import torch; print(f'GPU Available: {torch.cuda.is_available()}'); print(f'Device: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"None\"}')"
 # 3. Development Installation
 dev-install:
     @echo "🛠️ Installing trident-wm in editable mode..."
