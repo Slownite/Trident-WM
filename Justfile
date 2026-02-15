@@ -45,9 +45,5 @@ test-shapes config="configs/config_cpu_test.yaml":
 test:
     {{nix_cmd}} pytest src/trident_wm/tests/
 
-# 6. Utility Commands
-check-gpu:
-    {{nix_cmd}} python -c "import torch; print(f'GPU Available: {torch.cuda.is_available()}'); print(f'Device: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"None\"}')"
-
 dev *args:
     {{nix_cmd}} {{ if args == "" { "bash" } else { args } }}
