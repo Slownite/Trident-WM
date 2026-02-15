@@ -10,8 +10,8 @@ install-nix:
 # 2. Setup GPU Environment (Handles the RunPod driver mapping)
 setup-gpu:
     @echo "🔧 Mapping RunPod drivers to Nix-visible paths..."
-    sudo mkdir -p /run/opengl-driver/lib
-    sudo find /usr/lib/x86_64-linux-gnu -name 'libcuda.so*' -exec ln -sf {} /run/opengl-driver/lib/ \;
+    mkdir -p /run/opengl-driver/lib
+    find /usr/lib/x86_64-linux-gnu -name 'libcuda.so*' -exec ln -sf {} /run/opengl-driver/lib/ \;
     @echo "📦 Initializing GPU environment..."
     {{nix_cmd}} uv venv && {{nix_cmd}} uv pip install -e .[gpu]
 
